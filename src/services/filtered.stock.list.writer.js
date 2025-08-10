@@ -7,9 +7,9 @@ import fs from 'fs';
 import path from 'path';
 
 export class FilteredStockListWriter {
-  constructor({ timePeriod = 180, outputFile = 'filtered_stocks.json', priceMaxThreshold = 500, priceMinThreshold = 25 } = {}) {
+  constructor({ timePeriod = 180, outputFile = 'filtered_stocks.json', priceMaxThreshold = 500, priceMinThreshold = 25, dbName } = {}) {
     this.mongoUrl = 'mongodb://localhost:27017';
-    this.dbName = 'trend_finder';
+    this.dbName = dbName;
     this.collections = ['trend_neautral', 'trend_bearish'];
     this.timePeriod = timePeriod;
     this.outputFile = outputFile;

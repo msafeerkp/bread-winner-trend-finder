@@ -25,6 +25,7 @@ import { DistributedLockService } from './services/distributed.lock.service.js';
 import { StockResourceService } from './services/stock.resource.service.js';
 import { TrendFinderService } from './services/trend.finder.service.js';
 import { FilteredStockListWriter } from './services/filtered.stock.list.writer.js';
+import { Worker } from 'worker_threads';
 
 
 const httpService = new HttpService();
@@ -43,6 +44,37 @@ async function printProfile(accessToken) {
     logger.info(`User profile fetched for: ${profile.user_shortname}`);
 }
 
+
+function runTrenderFinderAsWorker(accessToken, interval, intervalType, timeLineLength) {
+    return new Promise((resolve, reject) => {
+        const worker = new Worker('./src/worker/trend.finder.worker.js', {
+            workerData: {
+                accessToken,
+                interval,
+                intervalType,
+                timeLineLength
+            }
+        });
+
+        worker.on('message', (message) => {
+            logger.info(`Worker message: ${message}`);
+        });
+
+        worker.on('error', (error) => {
+            logger.error(`Worker error: ${error}`);
+            reject(error);
+        });
+
+        worker.on('exit', (code) => {
+            if (code !== 0) {
+                reject(new Error(`Worker stopped with exit code ${code}`));
+            } else {
+                resolve();
+            }
+        });
+    });
+}
+
 async function main(clientId, accessToken) {
     logger.info('Starting Auto-Trade Console Application...');
     try {
@@ -54,12 +86,26 @@ async function main(clientId, accessToken) {
         const instrumentService = new InstrumentService(accessToken);
         await instrumentService.downloadInstruments(); 
 
-        const trendFinder = new TrendFinderService(accessToken);
-        await trendFinder.init();
-        await trendFinder.insertHistoricalData();
+        // Run trend finders in parallel using worker threads
+        const workers = [
+            runTrenderFinderAsWorker(accessToken, "3", "minute", Math.ceil((100/(7*4*4)))),
+            runTrenderFinderAsWorker(accessToken, "15", "minute", Math.ceil(100/(7*4))),
+            runTrenderFinderAsWorker(accessToken, "60", "minute", Math.ceil(100/7))
+        ];
 
-        const writer = new FilteredStockListWriter({ timePeriod: 180, outputFile: 'stock_list.json' });
-        await writer.writeFilteredList();
+        await Promise.all(workers);
+
+        // let trendFinder = new TrendFinderService(accessToken, "3", "minute", Math.ceil((100/(7*4*4))));
+        // await trendFinder.init();
+        // await trendFinder.insertHistoricalData();
+
+        // trendFinder = new TrendFinderService(accessToken, "15", "minute", Math.ceil(100/(7*4)));
+        // await trendFinder.init();
+        // await trendFinder.insertHistoricalData();
+
+        // trendFinder = new TrendFinderService(accessToken, "60", "minute", Math.ceil(100/7));
+        // await trendFinder.init();
+        // await trendFinder.insertHistoricalData();
 
         process.exit();
 

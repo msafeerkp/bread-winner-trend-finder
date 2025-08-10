@@ -2,18 +2,22 @@
 // Service to read curated stock lists from MongoDB and print symbols arrays
 import { MongoClient } from 'mongodb';
 import { HistoricalDataExecutor } from './historical.data.executor.js';
+import { FilteredStockListWriter } from './filtered.stock.list.writer.js';
 
 const MONGO_URI = 'mongodb://localhost:27017'; // Adjust if needed
 const DB_NAME = 'stockdb';
 const COLLECTION_NAME = 'curated_stock_lists';
 
 export class TrendFinderService {
-    constructor(accessToken) {
+    constructor(accessToken, interval, intervalType, timeLineLength) {
         this.mongoUri = MONGO_URI;
         this.client = new MongoClient(this.mongoUri);
         this.db = null;
         this.collection = null;
         this.accessToken = accessToken;
+        this.interval = interval;
+        this.intervalType = intervalType;
+        this.timeLineLength = timeLineLength;
     }
 
     async init() {
@@ -37,7 +41,7 @@ export class TrendFinderService {
             const today = new Date();
             const year = today.getFullYear();
             const month = String(today.getMonth() + 1).padStart(2, '0');
-            const day = String(today.getDate()).padStart(2, '0');
+            const day = String(today.getDate()-2).padStart(2, '0');
             const todayString = `${year}-${month}-${day}`;
 
             // Query documents with today's date
@@ -50,7 +54,7 @@ export class TrendFinderService {
                     for (let idx = 0; idx < doc.symbols.length; idx++) {
                         const symbol = doc.symbols[idx];
                         console.log(`[TrendFinderService] finding data for : ${symbol}`);
-                        const historicalDataExecutor = new HistoricalDataExecutor(this.accessToken, symbol, 100);
+                        const historicalDataExecutor = new HistoricalDataExecutor(this.accessToken, symbol, this.interval, this.intervalType, this.timeLineLength);
                         await historicalDataExecutor.execute();
                     }
                 } else {
@@ -61,6 +65,9 @@ export class TrendFinderService {
             if (count === 0) {
                 console.log('[TrendFinderService] No documents found in curated_stock_lists.');
             }
+            const dName = `trend_finder_${this.interval == 1 ? '' : this.interval}${this.intervalType}`;
+            const writer = new FilteredStockListWriter({ timePeriod: 180, outputFile: `stock_list_${this.interval}_${this.intervalType}.json`, dName });
+            await writer.writeFilteredList();
         } catch (err) {
             console.error('[TrendFinderService] Error reading documents:', err);
         }

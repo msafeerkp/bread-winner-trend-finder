@@ -5,12 +5,14 @@ import { StockTrendAnalyzer } from './stock.trend.analyzer.js';
 import { PATTERN_WEIGHTS } from './pattern.weights.js';
 
 export class HistoricalDataExecutor {
-    constructor(accessToken, stockSymbol, numDays) {
+    constructor(accessToken, stockSymbol, interval= 'day', intervalType, numDays) {
         this.accessToken = accessToken;
         this.stockSymbol = stockSymbol;
         this.numDays = numDays;
         this.historicalService = new HistoricalDataService(accessToken, stockSymbol);
         this.mongoReady = false;
+        this.interval = interval;
+        this.intervalType= intervalType;
     }
 
     async ensureMongoReady() {
@@ -37,8 +39,8 @@ export class HistoricalDataExecutor {
 
     async execute() {
         const now = new Date();
-        // Subtract numDays * 24 * 60 * 60 * 1000 milliseconds from current time (includes time, not just date)
-        const fromDate = new Date(now.getTime() - this.numDays * 24 * 60 * 60 * 1000);
+        // Subtract numDays * 24 * 60 * 60 * 1000 milliseconds from current time (includes time, not just date). plus 2 is added to avoid weekend
+        const fromDate = new Date(now.getTime() - (this.numDays + 2) * 24 * 60 * 60 * 1000);
 
         // Format: 'YYYY-MM-DD HH:mm:ss'
         function formatDateTime(dt) {
@@ -58,14 +60,14 @@ export class HistoricalDataExecutor {
 
         try {
             const candles = await this.historicalService.fetchHistoricalData({
-                interval: 'day',
+                interval: `${this.interval == 1 ? '' : this.interval}${this.intervalType}`,
                 from,
                 to
             });
             logger.info(`Fetched ${candles.length} historical candles for ${this.stockSymbol}`);
 
             await this.ensureMongoReady();
-            const db = getDB('trend_finder');
+            const db = getDB(`trend_finder_${this.interval == 1 ? '' : this.interval}${this.intervalType}`);
             const collection = db.collection(`${this.stockSymbol}_HIST`);
             const trendBearishCollection = db.collection(`trend_bearish`);
             const trendBullishCollection = db.collection(`trend_bullish`);
