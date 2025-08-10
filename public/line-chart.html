@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Continuous Line Chart Example</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@^2.0.0"></script>
+  <style>
+    body { font-family: sans-serif; margin: 40px; }
+    .chart-container {
+      position: relative;
+      height: 40vh;
+      width: 100vw;
+      overflow-x: auto;
+      overflow-y: hidden;
+      margin: 0 0 0 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    .controls {
+      margin-bottom: 16px;
+    }
+    #priceChart, #rsiChart {
+      display: block;
+      width: 100% !important;
+      height: 100% !important;
+      max-width: 100vw !important;
+      max-height: 40vh !important;
+      border: none;
+      padding: 0;
+      margin: 0;
+      overflow: hidden;
+      background: #fff;
+      /* Prevent scrollbars from rounding errors */
+      box-sizing: border-box;
+    }
+    html, body {
+      width: 100vw;
+      height: 100vh;
+      margin: 0;
+      padding: 0;
+      /* Only hide vertical scroll, allow horizontal for chart-container */
+      overflow-y: hidden;
+      overflow-x: auto;
+    }
+
+  </style>
+</head>
+<body>
+  <div class="content">
+    <h2 style="display: flex; align-items: center; justify-content: space-between;">
+      Price Chart
+      <span>
+        <button onclick="stopUpdates()" style="margin-right:8px;">Stop</button>
+        <button onclick="resumeUpdates()">Resume</button>
+      </span>
+    </h2>
+    <div class="chart-container">
+      <canvas id="priceChart"></canvas>
+    </div>
+    <div class="controls">
+      <button onclick="zoomInPrice()" style="margin-right:8px;">Zoom In</button>
+      <button onclick="zoomOutPrice()" style="margin-right:16px;">Zoom Out</button>
+      <button onclick="resetZoomPrice()">Reset Zoom</button>
+    </div>
+
+    <h2>RSI Chart</h2>
+    <div class="chart-container">
+      <canvas id="rsiChart"></canvas>
+    </div>
+    <div class="controls">
+      <button onclick="zoomInRSI()" style="margin-right:8px;">Zoom In</button>
+      <button onclick="zoomOutRSI()" style="margin-right:16px;">Zoom Out</button>
+      <button onclick="resetZoomRSI()">Reset Zoom</button>
+    </div>
+  </div>
+  <script>
+    let priceChart = null;
+    let rsiChart = null;
+    let priceInterval = null;
+    let rsiInterval = null;
+
+    // Register zoom plugin if needed
+    if (window.Chart && window.Chart.register && window.ChartZoom) {
+      Chart.register(window.ChartZoom);
+    }
+
+    function loadPriceChartData() {
+      fetch('/chart-data-price')
+        .then(res => res.json())
+        .then(({ labels, data }) => {
+          const priceCanvas = document.getElementById('priceChart');
+          const priceCtx = priceCanvas.getContext('2d');
+
+          // --- Price Chart ---
+          if (!priceChart) {
+            priceChart = new Chart(priceCtx, {
+              type: 'line',
+              data: {
+                labels: labels,
+                datasets: [{
+                  label: 'Price',
+                  data: data,
+                  borderColor: 'blue',
+                  backgroundColor: 'rgba(0,0,255,0.08)',
+                  fill: true,
+                  tension: 0.3,
+                  pointRadius: 0
+                }]
+              },
+              options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                  legend: {
+                    display: true,
+                    position: 'top',
+                    labels: {
+                      boxWidth: 20,
+                      padding: 20
+                    }
+                  },
+                  zoom: {
+                    pan: { enabled: true, mode: 'x' },
+                    zoom: {
+                      wheel: { enabled: true },
+                      pinch: { enabled: true },
+                      mode: 'x'
+                    }
+                  }
+                }
+              }
+            });
+          } else {
+            priceChart.data.labels = labels;
+            priceChart.data.datasets[0].data = data;
+            priceChart.update();
+          }
+        });
+    }
+
+    function loadRSIChartData() {
+      fetch('/chart-data-rsi')
+        .then(res => res.json())
+        .then(({ labels, data }) => {
+          const rsiCanvas = document.getElementById('rsiChart');
+          const rsiCtx = rsiCanvas.getContext('2d');
+
+          // --- RSI Chart ---
+          if (!rsiChart) {
+            rsiChart = new Chart(rsiCtx, {
+              type: 'line',
+              data: {
+                labels: labels,
+                datasets: [{
+                  label: 'RSI',
+                  data: data,
+                  borderColor: 'green',
+                  backgroundColor: 'rgba(0,255,0,0.08)',
+                  fill: true,
+                  tension: 0.3,
+                  pointRadius: 0
+                }]
+              },
+              options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                  zoom: {
+                    pan: { enabled: true, mode: 'x' },
+                    zoom: {
+                      wheel: { enabled: true },
+                      pinch: { enabled: true },
+                      mode: 'x'
+                    }
+                  }
+                },
+                scales: {
+                  y: {
+                    min: 0,
+                    max: 100
+                  }
+                }
+              }
+            });
+          } else {
+            rsiChart.data.labels = labels;
+            rsiChart.data.datasets[0].data = data;
+            rsiChart.update();
+          }
+        });
+    }
+
+    function zoomInPrice() {
+      if (priceChart) priceChart.zoom(1.5);
+    }
+    function zoomOutPrice() {
+      if (priceChart) priceChart.zoom(0.67);
+    }
+    function resetZoomPrice() {
+      if (priceChart) priceChart.resetZoom();
+    }
+    function zoomInRSI() {
+      if (rsiChart) rsiChart.zoom(1.5);
+    }
+    function zoomOutRSI() {
+      if (rsiChart) rsiChart.zoom(0.67);
+    }
+    function resetZoomRSI() {
+      if (rsiChart) rsiChart.resetZoom();
+    }
+
+    function startIntervals() {
+      priceInterval = setInterval(loadPriceChartData, 500);
+      rsiInterval = setInterval(loadRSIChartData, 500);
+    }
+
+    function stopUpdates() {
+      clearInterval(priceInterval);
+      clearInterval(rsiInterval);
+      priceInterval = null;
+      rsiInterval = null;
+    }
+
+    function resumeUpdates() {
+      if (!priceInterval) priceInterval = setInterval(loadPriceChartData, 500);
+      if (!rsiInterval) rsiInterval = setInterval(loadRSIChartData, 500);
+    }
+
+    // Initial load and start intervals
+    loadPriceChartData();
+    loadRSIChartData();
+    startIntervals();
+
+    window.addEventListener('beforeprint', () => {
+      if (priceChart) priceChart.resize(600, 300);
+      if (rsiChart) rsiChart.resize(600, 300);
+    });
+    window.addEventListener('afterprint', () => {
+      if (priceChart) priceChart.resize();
+      if (rsiChart) rsiChart.resize();
+    });
+  </script>
+</body>
+</html>
