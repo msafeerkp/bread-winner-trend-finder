@@ -24,17 +24,6 @@ export class StockTrendAnalyzer {
     return sum / period;
   }
 
-  detectEngulfing() {
-    if (this.candles.length < 2) return null;
-    const prev = this.candles[this.candles.length - 2];
-    const curr = this.candles[this.candles.length - 1];
-
-    const bullish = prev.close < prev.open && curr.close > curr.open && curr.close > prev.open && curr.open < prev.close;
-    const bearish = prev.close > prev.open && curr.close < curr.open && curr.close < prev.open && curr.open > prev.close;
-
-    return bullish ? 'Bullish Engulfing' : bearish ? 'Bearish Engulfing' : null;
-  }
-
   filterTrueValues(obj) {
     return Object.fromEntries(
         Object.entries(obj).filter(([key, value]) => value === true)
@@ -76,26 +65,22 @@ export class StockTrendAnalyzer {
     if (lastRSI > 50) reasons.push('RSI > 50');
     if (lastVolume > avgVolume * 1.5) reasons.push('Volume spike');
 
-    const pattern = this.detectEngulfing();
-    if (pattern) reasons.push(`Pattern detected: ${pattern}`);
-
-    if (lastBB) {
-      if (lastClose > lastBB.upper) reasons.push('Breakout Above Upper Band');
-      else if (lastClose < lastBB.lower) reasons.push('Breakdown Below Lower Band');
+    
+    let RSIStats = "NEUTRAL";
+    if(lastRSI > 60) {
+      RSIStats = "BULLISH";
+    } else if(lastRSI < 30){
+      RSIStats = "BEARISH_PEAK";
     }
+    RSIStats = {RSIStats, lastRSI};
 
-    // Score to determine trend
-    const bullishScore = reasons.filter(r =>
-      r.includes('EMA') || r.includes('MACD') || r.includes('RSI >') || r.includes('Bullish')
-    ).length;
-
-    const bearishScore = reasons.filter(r =>
-      r.includes('Breakdown') || r.includes('Bearish') || r.includes('RSI <') || r.includes('MACD bearish')
-    ).length;
-
-    const trend = bullishScore >= 3 ? 'Bullish'
-      : bearishScore >= 3 ? 'Bearish'
-      : 'Neutral';
+    let BBStats = "NEUTRAL"
+    if(lastClose > lastBB.upper && lastRSI > 60){
+      BBStats = "BB_UPPER_BREAK";
+    } else if(lastClose < lastBB.lower && lastRSI < 35) {
+      BBStats = "BB_LOWER_BREAK";
+    }
+    BBStats = {BBStats, lastClose, lastBB} 
 
     // const bullishDetector = new BullishPatternDetector();
     const bPatterns = BullishPatternDetector.detectAll(this.candles);
@@ -108,10 +93,13 @@ export class StockTrendAnalyzer {
     // // const neautralDetector = new NeutralPatternDetector();
     // const neatrualPatterns = NeutralPatternDetector.detectAll(this.candles);
     // const neatrual = this.getTrueKeys(neatrualPatterns);
+
     return {
       bullish,
       bearish,
-      //neatrual
+      RSIStats,
+      BBStats
     };
+
   }
 }

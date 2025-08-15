@@ -1,6 +1,3 @@
-import { createRequire } from 'module';
-const require = createRequire(import.meta.url);
-
 import technicalindicators from 'technicalindicators';
 
 const {
@@ -21,6 +18,16 @@ const {
     darkcloudcover: isDarkCloudCover,
 } = technicalindicators;
 
+function getCandles(candles, requiredCount){
+    const last3 = candles.slice(requiredCount);
+    const input = {
+        open: last3.map(c => c.open),
+        high: last3.map(c => c.high),
+        low: last3.map(c => c.low),
+        close: last3.map(c => c.close),
+    };
+    return input;
+}
 
 export class BearishPatternDetector {
     /**
@@ -33,41 +40,33 @@ export class BearishPatternDetector {
             throw new Error("At least 3 candles required for pattern detection.");
         }
 
-        const last3 = candles.slice(-6);
+        // const last3 = candles.slice(-6);
 
-        const input = {
-            open: last3.map(c => c.open),
-            high: last3.map(c => c.high),
-            low: last3.map(c => c.low),
-            close: last3.map(c => c.close),
-        };
+        // const input = {
+        //     open: last3.map(c => c.open),
+        //     high: last3.map(c => c.high),
+        //     low: last3.map(c => c.low),
+        //     close: last3.map(c => c.close),
+        // };
+
+        
 
         return {
-            bearishEngulfingPattern: isBearishEngulfing(input),
-            bearishHarami: isBearishHarami(input),
-            bearishHaramiCross: isBearishHaramiCross(input),
-            eveningDojiStar: isEveningDojiStar(input),
-            eveningStar: isEveningStar(input),
-            bearishMarubozu: isBearishMarubozu(input),
-            threeBlackCrows: isThreeBlackCrows(input),
-            bearishHammerStick: isBearishHammer(input),
-            bearishInvertedHammerStick: isBearishInvertedHammer(input),
-            hangingMan: IsHangingMan(input),
-            hangingManUnconfirmed: IsHangingManUnconfirmed(input),
-            shootingStar: IsShootingStar(input),
-            shootingStarUnconfirmed:IsShootingStarUnconfirmed(input),
-            tweezerTop: isTweezerTop(input),
-            darkCloudCover: isDarkCloudCover(input),
+            bearishEngulfingPattern: isBearishEngulfing(getCandles(candles, -2)),
+            bearishHarami: isBearishHarami(getCandles(candles, -2)),
+            bearishHaramiCross: isBearishHaramiCross(getCandles(candles, -2)),
+            eveningDojiStar: isEveningDojiStar(getCandles(candles, -3)),
+            eveningStar: isEveningStar(getCandles(candles, -3)),
+            bearishMarubozu: isBearishMarubozu(getCandles(candles, -1)),
+            threeBlackCrows: isThreeBlackCrows(getCandles(candles, -3)),
+            bearishHammerStick: isBearishHammer(getCandles(candles, -1)),
+            bearishInvertedHammerStick: isBearishInvertedHammer(getCandles(candles, -1)),
+            hangingMan: IsHangingMan(getCandles(candles, -5)),
+            hangingManUnconfirmed: IsHangingManUnconfirmed(getCandles(candles, -5)),
+            shootingStar: IsShootingStar(getCandles(candles, -5)),
+            shootingStarUnconfirmed:IsShootingStarUnconfirmed(getCandles(candles, -5)),
+            tweezerTop: isTweezerTop(getCandles(candles, -5)),
+            darkCloudCover: isDarkCloudCover(getCandles(candles, -2)),
         };
     }
 }
-
-// Example Usage
-const candles = [
-    { open: 58, high: 60, low: 46, close: 55 },
-    { open: 55, high: 57, low: 52, close: 56 },
-    { open: 56, high: 57, low: 45, close: 46 },
-];
-
-const results = BearishPatternDetector.detectAll(candles);
-console.log(results);

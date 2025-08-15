@@ -13,6 +13,7 @@ import { logger } from '../utils/logger.util.js';
         await trendFinder.init();
         await trendFinder.insertHistoricalData();
         
+        
         parentPort.postMessage(`Worker completed for ${interval} ${intervalType} interval`);
     } catch (error) {
         parentPort.postMessage(`Worker error: ${error.message}`);

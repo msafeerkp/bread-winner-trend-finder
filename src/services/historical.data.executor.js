@@ -38,6 +38,14 @@ export class HistoricalDataExecutor {
     }
 
     async execute() {
+
+        // Get today's date in YYYY-MM-DD format
+        const today = new Date();
+        const year = today.getFullYear();
+        const month = String(today.getMonth() + 1).padStart(2, '0');
+        const day = String(today.getDate()).padStart(2, '0');
+        const todayString = `${year}-${month}-${day}`;
+
         const now = new Date();
         // Subtract numDays * 24 * 60 * 60 * 1000 milliseconds from current time (includes time, not just date). plus 2 is added to avoid weekend
         const fromDate = new Date(now.getTime() - (this.numDays + 2) * 24 * 60 * 60 * 1000);
@@ -67,7 +75,7 @@ export class HistoricalDataExecutor {
             logger.info(`Fetched ${candles.length} historical candles for ${this.stockSymbol}`);
 
             await this.ensureMongoReady();
-            const db = getDB(`trend_finder_${this.interval == 1 ? '' : this.interval}${this.intervalType}`);
+            const db = getDB(`trend_finder_${this.interval == 1 ? '' : this.interval}${this.intervalType}_${todayString}`);
             const collection = db.collection(`${this.stockSymbol}_HIST`);
             const trendBearishCollection = db.collection(`trend_bearish`);
             const trendBullishCollection = db.collection(`trend_bullish`);
@@ -86,9 +94,12 @@ export class HistoricalDataExecutor {
             }));
             const stockTrendAnalyzer = new StockTrendAnalyzer(docs);
             const trend = stockTrendAnalyzer.analyze();
-            const { bullish, bearish} = this.calculateTrendScores(trend);
+            const { bullish, bearish } = this.calculateTrendScores(trend);
             // Threshold: Bullish/Bearish must be 2x Neutral to override
-            if (bullish > bearish) {
+            if (bullish > bearish || 
+                trend.BBStats.BBStats == "BB_UPPER_BREAK" || trend.BBStats.BBStats == "BB_LOWER_BREAK" || 
+                trend.RSIStats.RSIStats == "BULLISH" || trend.RSIStats.RSIStats == "BEARISH_PEAK"
+            ) {
                 trendBullishCollection.insertOne({...trend, stockSymbol: this.stockSymbol});
             } else if (bearish > bullish) {
                 trendBearishCollection.insertOne({...trend, stockSymbol: this.stockSymbol});

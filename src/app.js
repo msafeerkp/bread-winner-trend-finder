@@ -88,9 +88,10 @@ async function main(clientId, accessToken) {
 
         // Run trend finders in parallel using worker threads
         const workers = [
-            runTrenderFinderAsWorker(accessToken, "3", "minute", Math.ceil((100/(7*4*4)))),
-            runTrenderFinderAsWorker(accessToken, "15", "minute", Math.ceil(100/(7*4))),
-            runTrenderFinderAsWorker(accessToken, "60", "minute", Math.ceil(100/7))
+            // runTrenderFinderAsWorker(accessToken, "3", "minute", Math.ceil((100/(7*4*4)))),
+            //runTrenderFinderAsWorker(accessToken, "15", "minute", Math.ceil(100/(7*4))),
+            //runTrenderFinderAsWorker(accessToken, "60", "minute", Math.ceil(100/7)),
+            runTrenderFinderAsWorker(accessToken, "1", "day", Math.ceil(100))
         ];
 
         await Promise.all(workers);
