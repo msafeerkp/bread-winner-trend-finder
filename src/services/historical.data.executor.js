@@ -96,12 +96,20 @@ export class HistoricalDataExecutor {
             const trend = stockTrendAnalyzer.analyze();
             const { bullish, bearish } = this.calculateTrendScores(trend);
             // Threshold: Bullish/Bearish must be 2x Neutral to override
-            if (bullish > bearish || 
-                trend.BBStats.BBStats == "BB_UPPER_BREAK" || trend.BBStats.BBStats == "BB_LOWER_BREAK" || 
-                trend.RSIStats.RSIStats == "BULLISH" || trend.RSIStats.RSIStats == "BEARISH_PEAK"
-            ) {
+            // if (bullish > bearish || 
+            //     trend.BBStats.BBStats == "BB_UPPER_BREAK" || trend.BBStats.BBStats == "BB_LOWER_BREAK" || 
+            //     trend.RSIStats.RSIStats == "BULLISH" || trend.RSIStats.RSIStats == "BEARISH_PEAK"
+            // ) {
+            //     trendBullishCollection.insertOne({...trend, stockSymbol: this.stockSymbol});
+            // } else if (bearish > bullish) {
+            //     trendBearishCollection.insertOne({...trend, stockSymbol: this.stockSymbol});
+            // } else {
+            //     trendNeautralCollection.insertOne({...trend, stockSymbol: this.stockSymbol});
+            // }
+            let rsi = trend.RSIStats.lastRSI;
+            if(trend.trend.long.slope > 0.1){
                 trendBullishCollection.insertOne({...trend, stockSymbol: this.stockSymbol});
-            } else if (bearish > bullish) {
+            } else if(trend.trend.long.slope < -0.5) {
                 trendBearishCollection.insertOne({...trend, stockSymbol: this.stockSymbol});
             } else {
                 trendNeautralCollection.insertOne({...trend, stockSymbol: this.stockSymbol});

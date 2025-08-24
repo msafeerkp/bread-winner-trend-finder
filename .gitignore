@@ -166,3 +166,4 @@ package-lock.json
 data/instruments.csv
 client/build
 ToDo.txt
+stock_list_*.json

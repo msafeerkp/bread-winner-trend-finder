@@ -3,6 +3,7 @@ import { EMA, MACD, RSI, BollingerBands } from 'technicalindicators';
 import { BullishPatternDetector } from './bullish.pattern.detector.js';
 import { BearishPatternDetector } from './bearish.pattern.detector.js';
 import { NeutralPatternDetector } from './neutral.pattern.detector.js';
+import { RSITrendDetector } from './rsi.trend.detector.js';
 
 export class StockTrendAnalyzer {
   constructor(candles) {
@@ -93,12 +94,15 @@ export class StockTrendAnalyzer {
     // // const neautralDetector = new NeutralPatternDetector();
     // const neatrualPatterns = NeutralPatternDetector.detectAll(this.candles);
     // const neatrual = this.getTrueKeys(neatrualPatterns);
+    const detector = new RSITrendDetector(5, 14, this.close);
+    const trend = detector.update();
 
     return {
       bullish,
       bearish,
       RSIStats,
-      BBStats
+      BBStats,
+      trend
     };
 
   }
