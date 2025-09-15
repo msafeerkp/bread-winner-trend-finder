@@ -10,7 +10,7 @@ export class FilteredStockListWriter {
   constructor({ timePeriod = 180, outputFile = 'filtered_stocks.json', priceMaxThreshold = 500, priceMinThreshold = 25, dbName } = {}) {
     this.mongoUrl = 'mongodb://localhost:27017';
     this.dbName = dbName;
-    this.collections = ['trend_neautral', 'trend_bearish'];
+    this.collections = ['trend_bullish'];
     this.timePeriod = timePeriod;
     this.outputFile = outputFile;
     this.client = new MongoClient(this.mongoUrl);
@@ -19,16 +19,21 @@ export class FilteredStockListWriter {
     
   }
 
-  async getStockSymbols() {
+  async getStockDetails() {
     const db = this.client.db(this.dbName);
-    const symbolSet = new Set();
+    // const symbolSet = new Set();
+    const stockDetails = [];
     for (const col of this.collections) {
-      const docs = await db.collection(col).find({}, { projection: { stockSymbol: 1 } }).toArray();
+      const docs = await db.collection(col).find({}, { projection: { stockSymbol: 1,  bottom10: 1 } }).toArray();
       docs.forEach(doc => {
-        if (doc.stockSymbol) symbolSet.add(doc.stockSymbol);
+        if (doc.stockSymbol) {
+          stockDetails.push({symbol: doc.stockSymbol, bottom10: doc.bottom10, timePeriod: this.timePeriod})
+        }
       });
+      // stockDetails.push(docs)
     }
-    return Array.from(symbolSet);
+    return stockDetails;
+    // return Array.from(symbolSet);
   }
 
   async filterAbovePriceThreshold(symbols) {
@@ -47,9 +52,9 @@ export class FilteredStockListWriter {
   async writeFilteredList() {
     try {
       await this.client.connect();
-      let symbols = await this.getStockSymbols();
-      symbols = await this.filterAbovePriceThreshold(symbols);
-      const result = symbols.map(symbol => ({ symbol, timePeriod: this.timePeriod }));
+      let result = await this.getStockDetails();
+      // symbols = await this.filterAbovePriceThreshold(symbols);
+      // const result = stocks.map(stock => ({ ...stock, timePeriod: this.timePeriod }));
       const outputPath = path.resolve(process.cwd(), this.outputFile);
       fs.writeFileSync(outputPath, JSON.stringify(result, null, 2));
       console.log(`Filtered stock list written to ${outputPath}`);

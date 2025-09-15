@@ -5,11 +5,11 @@ import { logger } from '../utils/logger.util.js';
 
 (async () => {
     try {
-        const { accessToken, interval, intervalType, timeLineLength } = workerData;
+        const { accessToken, interval, intervalType, timeLineLength, identificationDate } = workerData;
         
         logger.info(`Worker started for ${interval} ${intervalType} interval`);
         
-        const trendFinder = new TrendFinderService(accessToken, interval, intervalType, timeLineLength);
+        const trendFinder = new TrendFinderService(accessToken, interval, intervalType, timeLineLength, identificationDate);
         await trendFinder.init();
         await trendFinder.insertHistoricalData();
         

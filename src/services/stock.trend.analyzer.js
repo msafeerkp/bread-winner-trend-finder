@@ -94,7 +94,7 @@ export class StockTrendAnalyzer {
     // // const neautralDetector = new NeutralPatternDetector();
     // const neatrualPatterns = NeutralPatternDetector.detectAll(this.candles);
     // const neatrual = this.getTrueKeys(neatrualPatterns);
-    const detector = new RSITrendDetector(5, 14, this.close);
+    const detector = new RSITrendDetector(375, 375*2, this.close);
     const trend = detector.update();
 
     return {

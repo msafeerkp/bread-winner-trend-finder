@@ -3,13 +3,15 @@
 import { MongoClient } from 'mongodb';
 import { HistoricalDataExecutor } from './historical.data.executor.js';
 import { FilteredStockListWriter } from './filtered.stock.list.writer.js';
+import { TrendDiscoveryVerification } from './trend.discovery.verification.service.js';
+import { logger } from '../utils/logger.util.js';
 
 const MONGO_URI = 'mongodb://localhost:27017'; // Adjust if needed
 const DB_NAME = 'stockdb';
 const COLLECTION_NAME = 'curated_stock_lists';
 
 export class TrendFinderService {
-    constructor(accessToken, interval, intervalType, timeLineLength) {
+    constructor(accessToken, interval, intervalType, timeLineLength, identificationDate = null) {
         this.mongoUri = MONGO_URI;
         this.client = new MongoClient(this.mongoUri);
         this.db = null;
@@ -18,6 +20,7 @@ export class TrendFinderService {
         this.interval = interval;
         this.intervalType = intervalType;
         this.timeLineLength = timeLineLength;
+        this.identificationDate = identificationDate;
     }
 
     async init() {
@@ -25,11 +28,18 @@ export class TrendFinderService {
             await this.client.connect();
             this.db = this.client.db(DB_NAME);
             this.collection = this.db.collection(COLLECTION_NAME);
-            console.log(`[TrendFinderService] Connected to MongoDB at ${this.mongoUri}`);
+            logger.info(`[TrendFinderService] Connected to MongoDB at ${this.mongoUri}`);
         } catch (err) {
-            console.error('[TrendFinderService] Failed to connect to MongoDB:', err);
+            logger.error('[TrendFinderService] Failed to connect to MongoDB:', err);
             throw err;
         }
+    }
+
+    getDateString(dateObj){
+        const year = dateObj.getFullYear();
+        const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+        const day = String(dateObj.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
     }
 
     async insertHistoricalData() {
@@ -43,6 +53,7 @@ export class TrendFinderService {
             const month = String(today.getMonth() + 1).padStart(2, '0');
             const day = String(today.getDate()).padStart(2, '0');
             const todayString = `${year}-${month}-${day}`;
+            
 
             // Query documents with today's date
             const cursor = this.collection.find({ date: todayString });
@@ -50,33 +61,49 @@ export class TrendFinderService {
             while (await cursor.hasNext()) {
                 const doc = await cursor.next();
                 if (Array.isArray(doc.symbols)) {
-                    console.log(`[TrendFinderService] Total docs: ${doc.symbols.length}`);
+                    logger.info(`[TrendFinderService] Total docs: ${doc.symbols.length}`);
                     for (let idx = 0; idx < doc.symbols.length; idx++) {
                         const symbol = doc.symbols[idx];
-                        console.log(`[TrendFinderService] finding data for : ${symbol}`);
-                        const historicalDataExecutor = new HistoricalDataExecutor(this.accessToken, symbol, this.interval, this.intervalType, this.timeLineLength);
-                        await historicalDataExecutor.execute();
+                        logger.info(`[TrendFinderService] finding data for : ${symbol}`);
+                        if(this.identificationDate){
+                            logger.info(`[TrendFinderService] verification : ${symbol}`);
+                            const trendDiscoveryVerification = new TrendDiscoveryVerification(this.accessToken, symbol, this.interval, this.intervalType, this.timeLineLength, this.identificationDate);
+                            await trendDiscoveryVerification.execute();
+                        } else {
+                            logger.info(`[TrendFinderService] finder : ${symbol}`);
+                            const historicalDataExecutor = new HistoricalDataExecutor(this.accessToken, symbol, this.interval, this.intervalType, this.timeLineLength);
+                            await historicalDataExecutor.execute();
+                        }
+                        
+
                     }
                 } else {
-                    console.log(`[TrendFinderService] Document _id: ${doc._id} has no symbols array.`);
+                    logger.info(`[TrendFinderService] Document _id: ${doc._id} has no symbols array.`);
                 }
                 count++;
             }
-            if (count === 0) {
-                console.log('[TrendFinderService] No documents found in curated_stock_lists.');
+            const dbName = `trend_finder_${this.interval == 1 ? '' : this.interval}${this.intervalType}_${this.getDateString(this.identificationDate)}`;
+            if(this.identificationDate && count > 0){
+                const dataBase = this.client.db(dbName)
+                const success = await dataBase.collection('trend_bearish').countDocuments({ trendIdentification : "SUCCESS" });
+                const failure = await dataBase.collection('trend_bearish').countDocuments({ trendIdentification : "FAILURE" });
+                logger.info(`[TrendFinderService] prediction success : ${success} failure : ${failure}.`);
             }
-            const dbName = `trend_finder_${this.interval == 1 ? '' : this.interval}${this.intervalType}_${todayString}`;
-            const writer = new FilteredStockListWriter({ timePeriod: 300, outputFile: `stock_list_${this.interval}_${this.intervalType}_${todayString}.json`, dbName });
+            if (count === 0) {
+                logger.info('[TrendFinderService] No documents found in curated_stock_lists.');
+            }
+            
+            const writer = new FilteredStockListWriter({ timePeriod: 300, outputFile: `stock_list_${this.interval}_${this.intervalType}_${this.getDateString(this.identificationDate)}.json`, dbName });
             await writer.writeFilteredList();
         } catch (err) {
-            console.error('[TrendFinderService] Error reading documents:', err);
+            logger.error('[TrendFinderService] Error reading documents:', err);
         }
     }
 
     async close() {
         if (this.client) {
             await this.client.close();
-            console.log('[TrendFinderService] MongoDB connection closed.');
+            logger.info('[TrendFinderService] MongoDB connection closed.');
         }
     }
 }

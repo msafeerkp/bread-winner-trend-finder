@@ -11,11 +11,20 @@ export class Logger {
         this.logDir = path.join(__dirname, '../../logs');
         this.logFile = path.join(this.logDir, 'app.log');
         this.ensureLogDirectory();
+        this.clearLogFile();
     }
 
     ensureLogDirectory() {
         if (!fs.existsSync(this.logDir)) {
             fs.mkdirSync(this.logDir, { recursive: true });
+        }
+    }
+
+    clearLogFile() {
+        if (fs.existsSync(this.logFile)) {
+            fs.writeFileSync(this.logFile, ""); // empty file
+        } else {
+            fs.writeFileSync(this.logFile, ""); // create empty file
         }
     }
 
