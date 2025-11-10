@@ -8,7 +8,7 @@ import { findResistanceLevels, findSupportLevels } from './support.finder.js';
 import { DynamicRSIRangeFinder } from './dynamic.rsi.range.finder.js';
 
 export class TrendDiscoveryVerification {
-    constructor(accessToken, stockSymbol, interval= 'day', intervalType, numDays, identificationDate, trendBulls = true, trendBears = false) {
+    constructor(accessToken, stockSymbol, interval= 'day', intervalType, numDays, trendBulls = true, trendBears = false) {
         this.accessToken = accessToken;
         this.stockSymbol = stockSymbol;
         this.numDays = numDays;
@@ -16,7 +16,6 @@ export class TrendDiscoveryVerification {
         this.mongoReady = false;
         this.interval = interval;
         this.intervalType= intervalType;
-        this.identificationDate = identificationDate;
         this.findBulls = trendBulls;
         this.findBears = trendBears;
     }
@@ -113,20 +112,21 @@ export class TrendDiscoveryVerification {
 
     async execute() {
 
-        // Get today's date in YYYY-MM-DD format
-        // const today = new Date();
-        // const year = today.getFullYear();
-        // const month = String(today.getMonth() + 1).padStart(2, '0');
-        // const day = String(today.getDate()).padStart(2, '0');
-        // const todayString = `${year}-${month}-${day}`;
-        
-
-        const prevVerificationDate = new Date(this.identificationDate.getTime() - 1 * 24 * 60 * 60 * 1000);
-        prevVerificationDate.setHours(23); // to avoid the loss of full date data
+        let toDateDerived = new Date();
+        let tomorrowDate = new Date();
+        tomorrowDate.setDate(tomorrowDate.getDate() + 1);
+        let dateString = this.getDateString(tomorrowDate);
+        if(toDateDerived.getHours() < 9){
+            // toDateDerived = new Date(this.identificationDate.getTime() - 1 * 24 * 60 * 60 * 1000);
+            dateString = this.getDateString(toDateDerived);
+            toDateDerived.setDate(toDateDerived.getDate() - 1);
+            toDateDerived.setHours(23); // to avoid the loss of full date data
+        }
+       
         // Subtract numDays * 24 * 60 * 60 * 1000 milliseconds from current time (includes time, not just date). plus 2 is added to avoid weekend
-        const fromDate = new Date(prevVerificationDate.getTime() - (this.numDays * 24 * 60 * 60 * 1000));
+        const fromDate = new Date(toDateDerived.getTime() - (this.numDays * 24 * 60 * 60 * 1000));
 
-        const to = this.formatDateTime(prevVerificationDate);
+        const to = this.formatDateTime(toDateDerived);
         const from = this.formatDateTime(fromDate);
 
         try {
@@ -138,7 +138,7 @@ export class TrendDiscoveryVerification {
             logger.info(`Fetched ${candles.length} historical candles for ${this.stockSymbol}`);
 
             await this.ensureMongoReady();
-            const db = getDB(`trend_finder_${this.interval == 1 ? '' : this.interval}${this.intervalType}_${this.getDateString(this.identificationDate)}`);
+            const db = getDB(`trend_finder_${this.interval == 1 ? '' : this.interval}${this.intervalType}_${dateString}`);
             const collection = db.collection(`${this.stockSymbol}_HIST`);
             const trendBearishCollection = db.collection(`trend_bearish`);
             const trendBullishCollection = db.collection(`trend_bullish`);
@@ -182,18 +182,27 @@ export class TrendDiscoveryVerification {
             logger.info(`slope value : ${trend.trend.short.slope}, for stock ${this.stockSymbol}`);
             if(!this.isVerificationPossible()){
                 logger.info(`verification not possible for stock ${this.stockSymbol}`);
-                const supportDetails = findSupportLevels(docs, 2*375);
-                const resistenceDetails = findResistanceLevels(docs, 2*375);
-                logger.info(`supportDetails for stock ${this.stockSymbol} supportDetails: ${supportDetails}`);
+                // const supportDetails = findSupportLevels(docs, 2*375); // Not Considered for now
+                //const resistenceDetails = findResistanceLevels(docs, 2*375); // Not Considered for now
+                // logger.info(`supportDetails for stock ${this.stockSymbol} supportDetails: ${supportDetails}`);
+                const dynamicRSIRangeFinder = new DynamicRSIRangeFinder(14, (5*375)+15, docs, 15); // 2minutes for last 5 days
+                const { top90, top95, bottom10, bottom5, nearBottom5, nearBottom10, nearTop90, nearTop95 } = dynamicRSIRangeFinder.calculate();
                 if(trend.trend.short.slope > 0){
-                    const dynamicRSIRangeFinder = new DynamicRSIRangeFinder(14, (2*375)+15, docs, 15);
-                    const { top90, top95, bottom10, bottom5, nearBottom5, nearBottom10 } = dynamicRSIRangeFinder.calculate();
-                    logger.info(`first level bearishness passed for stock ${this.stockSymbol}`);
+                    logger.info(`first level bullishness passed for stock ${this.stockSymbol}`);
                     // let bullishFilterScenarios = new BullishFilterScenarios(docs.slice(-2));
                     // if(!bullishFilterScenarios.isPossibleUptrend()){
                     if(nearBottom5 || nearBottom10) {
+                        logger.info(`second level bullishness passed for stock ${this.stockSymbol}`);
+                        trendBullishCollection.insertOne({...trend, stockSymbol: this.stockSymbol, bottom5, bottom10, top90, top95 });
+                    }
+                    // }
+                } else if(trend.trend.short.slope < 0){
+                    logger.info(`first level bearishness passed for stock ${this.stockSymbol}`);
+                    // let bearishFilterScenarios = new BearishFilterScenarios(docs.slice(-2));
+                    // if(!bearishFilterScenarios.isPossibleDowntrend()){
+                    if(nearTop90 || nearTop95) {
                         logger.info(`second level bearishness passed for stock ${this.stockSymbol}`);
-                        trendBullishCollection.insertOne({...trend, stockSymbol: this.stockSymbol, bottom5, bottom10, top90, top95, supportDetails, resistenceDetails });
+                        trendBearishCollection.insertOne({...trend, stockSymbol: this.stockSymbol, bottom5, bottom10, top90, top95 });
                     }
                     // }
                 }

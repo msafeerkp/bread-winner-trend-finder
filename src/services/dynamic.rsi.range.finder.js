@@ -35,9 +35,11 @@ export class DynamicRSIRangeFinder {
         // Check if current RSI is nearing oversold
         const nearBottom10 = currentRSI <= (bottom10 + this.tolerance);
         const nearBottom5 = currentRSI <= (bottom5 + this.tolerance);
+        const nearTop90 = currentRSI >= (top90 - this.tolerance);
+        const nearTop95 = currentRSI >= (top95 - this.tolerance);
 
-        logger.info(`Dynamic RSI near bottom + tolerence: ${bottom10 + this.tolerance}, currentRSI : ${currentRSI}`);
+        logger.info(`Dynamic RSI near bottom + tolerence: ${bottom10 + this.tolerance}, currentRSI : ${currentRSI}, nearBottom10 : ${nearBottom10}, nearBottom5 : ${nearBottom5}, nearTop90 : ${nearTop90}, nearTop95 : ${nearTop95}`);
 
-        return { top90, top95, bottom5, bottom10, nearBottom10, nearBottom5 };
+        return { top90, top95, bottom5, bottom10, nearBottom10, nearBottom5, nearTop90, nearTop95 };
     }
 }

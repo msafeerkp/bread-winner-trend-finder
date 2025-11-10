@@ -48,16 +48,12 @@ async function printProfile(accessToken) {
 function runTrenderFinderAsWorker(accessToken, interval, intervalType, timeLineLength) {
     return new Promise((resolve, reject) => {
         const now = new Date();
-        // const identificationDate = new Date(now.getTime() * 24 * 60 * 60 * 1000);
-        // verificationDate.setHours(9)
         const worker = new Worker('./src/worker/trend.finder.worker.js', {
             workerData: {
                 accessToken,
                 interval,
                 intervalType,
-                timeLineLength,
-                identificationDate: now,
-                // verificationDate: now,
+                timeLineLength
             }
         });
 
@@ -96,7 +92,7 @@ async function main(clientId, accessToken) {
             // runTrenderFinderAsWorker(accessToken, "3", "minute", Math.ceil((100/(7*4*4)))),
             //runTrenderFinderAsWorker(accessToken, "15", "minute", Math.ceil(100/(7*4))),
             // runTrenderFinderAsWorker(accessToken, "60", "minute", Math.ceil(100/7)),
-            runTrenderFinderAsWorker(accessToken, "5", "minute", 15)
+            runTrenderFinderAsWorker(accessToken, "1", "minute", 8) // 6 days including 2 week ends
         ];
 
         await Promise.all(workers);

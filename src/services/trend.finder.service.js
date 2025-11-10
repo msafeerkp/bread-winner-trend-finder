@@ -11,7 +11,7 @@ const DB_NAME = 'stockdb';
 const COLLECTION_NAME = 'curated_stock_lists';
 
 export class TrendFinderService {
-    constructor(accessToken, interval, intervalType, timeLineLength, identificationDate = null) {
+    constructor(accessToken, interval, intervalType, timeLineLength) {
         this.mongoUri = MONGO_URI;
         this.client = new MongoClient(this.mongoUri);
         this.db = null;
@@ -20,7 +20,6 @@ export class TrendFinderService {
         this.interval = interval;
         this.intervalType = intervalType;
         this.timeLineLength = timeLineLength;
-        this.identificationDate = identificationDate;
     }
 
     async init() {
@@ -48,15 +47,35 @@ export class TrendFinderService {
         }
         try {
             // Get today's date in YYYY-MM-DD format
-            const today = new Date();
-            const year = today.getFullYear();
-            const month = String(today.getMonth() + 1).padStart(2, '0');
-            const day = String(today.getDate()).padStart(2, '0');
-            const todayString = `${year}-${month}-${day}`;
+            let today = new Date();
+            let targetDate = new Date();
+            const dayOfWeek = today.getDay(); // 0=Sunday, 1=Monday, ..., 6=Saturday
+            const hour = today.getHours();
+
+            // Determine target date based on day and time
+            if (dayOfWeek === 0) {
+                // Sunday → next Monday
+                targetDate.setDate(targetDate.getDate() + 1);
+            } else if (dayOfWeek === 6) {
+                // Saturday → next Monday
+                targetDate.setDate(targetDate.getDate() + 2);
+            } else if (dayOfWeek === 5 && hour >= 16) {
+                // Friday after 4PM → next Monday
+                targetDate.setDate(targetDate.getDate() + 3);
+            } else if (hour >= 16) {
+                // Weekday (Mon-Thu) after 4PM → tomorrow
+                targetDate.setDate(targetDate.getDate() + 1);
+            } else if (hour < 9) {
+                // Before 9AM on weekday → today (targetDate is already today)
+            }
+            // else: Weekday between 9AM-4PM → today (targetDate is already today)
+
+            const dateString = this.getDateString(targetDate);
+       
             
 
             // Query documents with today's date
-            const cursor = this.collection.find({ date: todayString });
+            const cursor = this.collection.find({ date: dateString });
             let count = 0;
             while (await cursor.hasNext()) {
                 const doc = await cursor.next();
@@ -65,9 +84,9 @@ export class TrendFinderService {
                     for (let idx = 0; idx < doc.symbols.length; idx++) {
                         const symbol = doc.symbols[idx];
                         logger.info(`[TrendFinderService] finding data for : ${symbol}`);
-                        if(this.identificationDate){
-                            logger.info(`[TrendFinderService] verification : ${symbol}`);
-                            const trendDiscoveryVerification = new TrendDiscoveryVerification(this.accessToken, symbol, this.interval, this.intervalType, this.timeLineLength, this.identificationDate);
+                        if(true){
+                            logger.info(`[TrendFinderService] New Service : ${symbol}`);
+                            const trendDiscoveryVerification = new TrendDiscoveryVerification(this.accessToken, symbol, this.interval, this.intervalType, this.timeLineLength);
                             await trendDiscoveryVerification.execute();
                         } else {
                             logger.info(`[TrendFinderService] finder : ${symbol}`);
@@ -82,18 +101,21 @@ export class TrendFinderService {
                 }
                 count++;
             }
-            const dbName = `trend_finder_${this.interval == 1 ? '' : this.interval}${this.intervalType}_${this.getDateString(this.identificationDate)}`;
-            if(this.identificationDate && count > 0){
-                const dataBase = this.client.db(dbName)
-                const success = await dataBase.collection('trend_bearish').countDocuments({ trendIdentification : "SUCCESS" });
-                const failure = await dataBase.collection('trend_bearish').countDocuments({ trendIdentification : "FAILURE" });
-                logger.info(`[TrendFinderService] prediction success : ${success} failure : ${failure}.`);
-            }
+            const dbName = `trend_finder_${this.interval == 1 ? '' : this.interval}${this.intervalType}_${dateString}`;
+            // if(this.identificationDate && count > 0){
+            //     const dataBase = this.client.db(dbName)
+            //     const success = await dataBase.collection('trend_bearish').countDocuments({ trendIdentification : "SUCCESS" });
+            //     const failure = await dataBase.collection('trend_bearish').countDocuments({ trendIdentification : "FAILURE" });
+            //     logger.info(`[TrendFinderService] prediction success : ${success} failure : ${failure}.`);
+            // }
+            const dataBase = this.client.db(dbName);
+            const bullishCount = await dataBase.collection('trend_bullish').countDocuments();
+            logger.info(`[TrendFinderService] bullish list count : ${bullishCount}`);
             if (count === 0) {
                 logger.info('[TrendFinderService] No documents found in curated_stock_lists.');
             }
             
-            const writer = new FilteredStockListWriter({ timePeriod: 300, outputFile: `stock_list_${this.interval}_${this.intervalType}_${this.getDateString(this.identificationDate)}.json`, dbName });
+            const writer = new FilteredStockListWriter({ timePeriod: 60, outputFile: `stock_list_${this.interval}_${this.intervalType}_${dateString}.json`, dbName });
             await writer.writeFilteredList();
         } catch (err) {
             logger.error('[TrendFinderService] Error reading documents:', err);

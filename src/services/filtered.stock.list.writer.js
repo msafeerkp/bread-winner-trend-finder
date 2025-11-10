@@ -5,6 +5,7 @@
 import { MongoClient } from 'mongodb';
 import fs from 'fs';
 import path from 'path';
+import config from '../config/config.js';
 
 export class FilteredStockListWriter {
   constructor({ timePeriod = 180, outputFile = 'filtered_stocks.json', priceMaxThreshold = 500, priceMinThreshold = 25, dbName } = {}) {
@@ -19,21 +20,16 @@ export class FilteredStockListWriter {
     
   }
 
-  async getStockDetails() {
+  async getStockDetails(collectionName) {
     const db = this.client.db(this.dbName);
-    // const symbolSet = new Set();
     const stockDetails = [];
-    for (const col of this.collections) {
-      const docs = await db.collection(col).find({}, { projection: { stockSymbol: 1,  bottom10: 1 } }).toArray();
-      docs.forEach(doc => {
-        if (doc.stockSymbol) {
-          stockDetails.push({symbol: doc.stockSymbol, bottom10: doc.bottom10, timePeriod: this.timePeriod})
-        }
-      });
-      // stockDetails.push(docs)
-    }
+    const docs = await db.collection(collectionName).find({}).toArray();
+    docs.forEach(doc => {
+      if (doc.stockSymbol) {
+        stockDetails.push({ symbol: doc.stockSymbol, bottom5: doc.bottom5, bottom10: doc.bottom10, top90: doc.top90, top95: doc.top95, timePeriod: this.timePeriod });
+      }
+    });
     return stockDetails;
-    // return Array.from(symbolSet);
   }
 
   async filterAbovePriceThreshold(symbols) {
@@ -52,12 +48,16 @@ export class FilteredStockListWriter {
   async writeFilteredList() {
     try {
       await this.client.connect();
-      let result = await this.getStockDetails();
+      const bullishStocks = await this.getStockDetails('trend_bullish');
+      const bearishStocks = await this.getStockDetails('trend_bearish');
       // symbols = await this.filterAbovePriceThreshold(symbols);
       // const result = stocks.map(stock => ({ ...stock, timePeriod: this.timePeriod }));
-      const outputPath = path.resolve(process.cwd(), this.outputFile);
-      fs.writeFileSync(outputPath, JSON.stringify(result, null, 2));
-      console.log(`Filtered stock list written to ${outputPath}`);
+      const trendingOutPath = config.customFilePath?.length ? path.resolve(config.customFilePath, "trending.stocks.json") : path.resolve(process.cwd(), this.outputFile);
+      fs.writeFileSync(trendingOutPath, JSON.stringify(bullishStocks, null, 2));
+      console.log(`Trending stock list written to ${trendingOutPath}`);
+      const fallingOutPath = config.customFilePath?.length ? path.resolve(config.customFilePath, "falling.stocks.json") : path.resolve(process.cwd(), this.outputFile);
+      fs.writeFileSync(fallingOutPath, JSON.stringify(bearishStocks, null, 2));
+      console.log(`Falling stock list written to ${fallingOutPath}`);
     } catch (err) {
       console.error('Error:', err);
       process.exit(1);
