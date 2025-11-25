@@ -191,19 +191,19 @@ export class TrendDiscoveryVerification {
                     logger.info(`first level bullishness passed for stock ${this.stockSymbol}`);
                     // let bullishFilterScenarios = new BullishFilterScenarios(docs.slice(-2));
                     // if(!bullishFilterScenarios.isPossibleUptrend()){
-                    if(nearBottom5 || nearBottom10) {
+                    //if(nearBottom5 || nearBottom10) {
                         logger.info(`second level bullishness passed for stock ${this.stockSymbol}`);
                         trendBullishCollection.insertOne({...trend, stockSymbol: this.stockSymbol, bottom5, bottom10, top90, top95 });
-                    }
+                    //}
                     // }
                 } else if(trend.trend.short.slope < 0){
                     logger.info(`first level bearishness passed for stock ${this.stockSymbol}`);
                     // let bearishFilterScenarios = new BearishFilterScenarios(docs.slice(-2));
                     // if(!bearishFilterScenarios.isPossibleDowntrend()){
-                    if(nearTop90 || nearTop95) {
+                    //if(nearTop90 || nearTop95) {
                         logger.info(`second level bearishness passed for stock ${this.stockSymbol}`);
                         trendBearishCollection.insertOne({...trend, stockSymbol: this.stockSymbol, bottom5, bottom10, top90, top95 });
-                    }
+                    //}
                     // }
                 }
             } else {
